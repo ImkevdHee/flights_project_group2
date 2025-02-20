@@ -6,7 +6,6 @@ import os
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 import numpy as np
-os.chdir("/Users/imkevanderhee/Desktop")
 
 df = pd.read_csv("airports.csv")
 
