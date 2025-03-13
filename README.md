@@ -16,5 +16,5 @@ This project analyzes airport data, including geospatial visualizations, cluster
 ## Authors
 - Karam-Eddine Âbbadi
 - Achraf Hmydou
-- ..
+- Kyboo Shubin
 - Imke van der Hee
