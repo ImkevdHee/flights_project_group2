@@ -71,10 +71,14 @@ def plot_airports_lines(faa_codes):
     fig.update_layout(
         title=f"NYC to Multiple Airports",
         geo=dict(
-            projection_type=projection,
+            scope='usa',
+            projection_type='albers usa',
             showland=True,
-            landcolor='white',
-            countrycolor='lightgray'
+            landcolor='lightgray',
+            countrycolor='gray',
+            showcoastlines=True,
+            coastlinecolor='Black',
+            showframe=False
         )
     )
 
