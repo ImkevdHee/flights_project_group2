@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 
@@ -23,8 +24,6 @@ HUNDRED_PERCENT = 100
 
 
 
-
-
 # Variables
 default_departure_airport = ['LGA', 'EWR', "JFK"]
 default_destination_airport = ['BOS', 'ORD', 'MCO']
@@ -32,10 +31,15 @@ default_start_date = datetime.date(2023, 1, 1)    #YYYY/MM/DD
 default_end_date = datetime.date(2023, 12, 31)    #YYYY/MM/DD
 number_decimals_average_delay = 1
 number_decimals_percentage_delay = 1
+plot_label_fontsize = 12
+plot_title_fontsize = 14
+arrival_dist_bins = 30
+
 
 
 # Page Customization
 st.set_page_config(layout="wide")
+
 
 
 # ---------------------------------- DATA PREPARATION ---------------------------------- #
@@ -50,7 +54,6 @@ df['sched_dep_datetime'] = pd.to_datetime(df['sched_dep_datetime'])
 df['dep_datetime'] = pd.to_datetime(df['dep_datetime'])
 df['sched_arr_datetime'] = pd.to_datetime(df['sched_arr_datetime'])
 df['arr_datetime'] = pd.to_datetime(df['arr_datetime'])
-
 
 
 
@@ -72,6 +75,7 @@ def get_flight_statistics(df):
     return total_flights, unique_destinations, most_frequent_destination, most_frequent_count
 
 
+
 # Average Departure Delay
 def get_average_departure_delay(df):
 
@@ -81,8 +85,12 @@ def get_average_departure_delay(df):
     return round(df['dep_delay'].mean(), number_decimals_average_delay)
 
 
+
 # Percentage Delayed vs On Time
 def get_percentage_delayed(df):
+
+    if len(df) == 0:
+        return '-', '-'
 
     total = len(df)
     delayed = sum(df['dep_delay'] != 0)
@@ -92,6 +100,23 @@ def get_percentage_delayed(df):
     percentage_on_time = round(float(on_time)/total * HUNDRED_PERCENT, number_decimals_percentage_delay)
 
     return percentage_delayed, percentage_on_time
+
+
+
+# Data for Arrival Distribution
+def get_data_for_arrival_distribution(df):
+    
+    if len(df) == 0:
+        return '-'
+
+    data = df[df['arr_delay'] < df['arr_delay'].quantile(0.99)] # Drop last percentile to exclude outliers
+    data = data['arr_delay']
+    return data
+
+
+
+# Categorize Part of Day
+#def categorize_time_of_day(df)
     
 
     
@@ -135,14 +160,19 @@ with top_date_selection:
                                  value=default_end_date,
                                  min_value=MIN_DATE,
                                  max_value=MAX_DATE)
+    #with col3:
+    #    part_of_day = st.selectbox("Select Part of Day",
+    #                               options=["Anytime", "Morning", "Afternoon", "Evening"])
 
 
+
+# ---------------------------------- NUMERICAL STATISTICS ----------------------------------- #
 
 # Adjust DataFrame to Chosen Destinations and Dates
 adjusted_df = df.loc[
                      df['origin'].isin(departure_airports) &
                     (df['dest'].isin(arrival_airports)) &
-                    (df['dep_datetime'].dt.date > start_date) &
+                    (df['dep_datetime'].dt.date >= start_date) &
                     (df['dep_datetime'].dt.date <= end_date)
                      ]
 
@@ -180,23 +210,63 @@ with numerical_statistics_container:
             st.write("Most frequent destination")
 
 
-# Container Graphical Statistics
 
+# ---------------------------------- GRAPHICAL STATISTICS ----------------------------------- #
+
+# Container Graphical Statistics
+graphical_statistics_container = st.container()
+col1, col2 = st.columns(2,border=True,)
+
+
+
+# Pie Chart
 delayed_percentage, on_time_percentage = get_percentage_delayed(adjusted_df)
 
-graphical_statistics_container = st.container()
-col1, col2, col3 = st.columns(3)
-with col1:
-    labels = ['Delayed', "On time"]
-    explosion_value = 0.01
-    fig1, ax1 = plt.subplots()
 
-    ax1.pie([delayed_percentage, on_time_percentage],
-            labels=labels,
-            explode=[explosion_value,explosion_value],
-            autopct="%1.1f%%",
-            colors=['gray', 'blue'],
-            radius=1,
-            #textprops={'size':'smaller'}
-            )
-    col1.pyplot(fig1)
+if not isinstance(delayed_percentage, float):
+    col2.write("No flights found")
+else:
+    with col2:
+        labels = ['Delayed', "On time"]
+        explosion_values = [0.03, 0]
+        fig1, ax1 = plt.subplots(figsize=(10,6))
+
+        ax1.pie([delayed_percentage, on_time_percentage],
+                labels=labels,
+                explode=explosion_values,
+                autopct="%1.1f%%",
+                colors=['lightgray', 'dodgerblue'],
+                radius=0.8,
+                wedgeprops={'edgecolor': 'black'},
+                textprops={'fontsize': plot_label_fontsize, 'fontweight':'bold'}
+                )
+        ax1.set_title("Flight Departures Delayed vs On Time")
+        col2.pyplot(fig1)
+
+
+
+# Arrival Distribution
+arrival_data = get_data_for_arrival_distribution(adjusted_df)
+
+if isinstance(arrival_data, str):
+    col1.write("No flights found")
+else:
+    with col1:
+        fig2, ax2 = plt.subplots(figsize=(10,6))
+        sns.histplot(arrival_data, 
+                     ax=ax2, 
+                     bins=arrival_dist_bins, 
+                     color='royalblue',
+                     alpha=0.7,
+                     kde=True
+                     )
+        ax2.set_xlabel("Arrival Delay (minutes)", fontsize=plot_label_fontsize)
+        ax2.set_ylabel("Frequency", fontsize=plot_label_fontsize)
+        ax2.set_title("Arrival Delay Distribution", 
+                      fontsize=plot_title_fontsize,
+                      fontweight='bold'
+                      )
+        ax2.grid(True, linestyle='--', alpha=0.5)
+        
+        col1.pyplot(fig2)
+        
