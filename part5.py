@@ -16,7 +16,7 @@ data_path = "flights_processed.csv"
 # Constants
 MIN_DATE = datetime.date(2023, 1, 1)              #YYYY/MM/DD
 MAX_DATE = datetime.date(2023, 12, 31)            #YYYY/MM/DD
-DATE_COLUMNS = 2
+DATE_COLUMNS = 3
 OUTER_NUMERICAL_COLUMNS = 3
 INNER_NUMERICAL_COLUMNS = 2
 LOGO_WIDTH = 250
@@ -39,21 +39,6 @@ arrival_dist_bins = 30
 
 # Page Customization
 st.set_page_config(layout="wide")
-
-
-
-# ---------------------------------- DATA PREPARATION ---------------------------------- #
-
-# Load the DataFrame
-df = pd.read_csv(data_path)
-
-
-
-# Convert Objects Back to Datetime
-df['sched_dep_datetime'] = pd.to_datetime(df['sched_dep_datetime'])
-df['dep_datetime'] = pd.to_datetime(df['dep_datetime'])
-df['sched_arr_datetime'] = pd.to_datetime(df['sched_arr_datetime'])
-df['arr_datetime'] = pd.to_datetime(df['arr_datetime'])
 
 
 
@@ -113,11 +98,36 @@ def get_data_for_arrival_distribution(df):
     data = data['arr_delay']
     return data
 
-
-
 # Categorize Part of Day
-#def categorize_time_of_day(df)
-    
+def categorize_time_of_day(hour):
+    if 0 <= hour < 6:
+        return 'Night'
+    elif 6 <= hour < 12:
+        return 'Morning'
+    elif 12 <= hour < 18:
+        return 'Afternoon'
+    else:
+        return 'Evening'
+
+
+
+# ---------------------------------- DATA PREPARATION ---------------------------------- #
+
+# Load the DataFrame
+df = pd.read_csv(data_path)
+
+
+
+# Convert Objects Back to Datetime
+df['sched_dep_datetime'] = pd.to_datetime(df['sched_dep_datetime'])
+df['dep_datetime'] = pd.to_datetime(df['dep_datetime'])
+df['sched_arr_datetime'] = pd.to_datetime(df['sched_arr_datetime'])
+df['arr_datetime'] = pd.to_datetime(df['arr_datetime'])
+
+
+
+# Add Part of Day Column to DataFrame
+df['part_of_day'] = df['hour'].apply(categorize_time_of_day)
 
     
 
@@ -147,7 +157,7 @@ with title_container:
 # Container Date Selection
 top_date_selection = st.container()
 
-col1, col2 = st.columns(DATE_COLUMNS)
+col1, col2, col3 = st.columns(DATE_COLUMNS)
 
 with top_date_selection:
     with col1:
@@ -160,21 +170,23 @@ with top_date_selection:
                                  value=default_end_date,
                                  min_value=MIN_DATE,
                                  max_value=MAX_DATE)
-    #with col3:
-    #    part_of_day = st.selectbox("Select Part of Day",
-    #                               options=["Anytime", "Morning", "Afternoon", "Evening"])
+    with col3:
+        part_of_day = st.selectbox("Select Part of Day",
+                                   options=["Anytime", "Night", "Morning", "Afternoon", "Evening"])
 
 
 
 # ---------------------------------- NUMERICAL STATISTICS ----------------------------------- #
 
-# Adjust DataFrame to Chosen Destinations and Dates
+# Adjust DataFrame to Chosen Destinations, Dates and Part of Day
 adjusted_df = df.loc[
                      df['origin'].isin(departure_airports) &
                     (df['dest'].isin(arrival_airports)) &
                     (df['dep_datetime'].dt.date >= start_date) &
                     (df['dep_datetime'].dt.date <= end_date)
-                     ]
+                    ]
+if part_of_day != "Anytime":
+    adjusted_df = adjusted_df.loc[df['part_of_day'] == part_of_day]
 
 
 
@@ -215,7 +227,7 @@ with numerical_statistics_container:
 
 # Container Graphical Statistics
 graphical_statistics_container = st.container()
-col1, col2 = st.columns(2,border=True,)
+col1, col2 = st.columns([2,1],border=True)
 
 
 
@@ -229,7 +241,8 @@ else:
     with col2:
         labels = ['Delayed', "On time"]
         explosion_values = [0.03, 0]
-        fig1, ax1 = plt.subplots(figsize=(10,6))
+        sns.set_theme(style="whitegrid")
+        fig1, ax1 = plt.subplots(figsize=(4,4))
 
         ax1.pie([delayed_percentage, on_time_percentage],
                 labels=labels,
@@ -238,9 +251,11 @@ else:
                 colors=['lightgray', 'dodgerblue'],
                 radius=0.8,
                 wedgeprops={'edgecolor': 'black'},
-                textprops={'fontsize': plot_label_fontsize, 'fontweight':'bold'}
+                textprops={'fontsize': plot_label_fontsize,}
                 )
-        ax1.set_title("Flight Departures Delayed vs On Time")
+        ax1.set_title("Flight Departures Delayed vs On Time",
+                      fontsize=plot_title_fontsize,
+                      fontweight='bold')
         col2.pyplot(fig1)
 
 
@@ -252,7 +267,7 @@ if isinstance(arrival_data, str):
     col1.write("No flights found")
 else:
     with col1:
-        fig2, ax2 = plt.subplots(figsize=(10,6))
+        fig2, ax2 = plt.subplots(figsize=(6,4))
         sns.histplot(arrival_data, 
                      ax=ax2, 
                      bins=arrival_dist_bins, 
