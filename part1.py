@@ -1,11 +1,10 @@
-# part1.py
-
 import pandas as pd
 import plotly.express as px
 import os
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.cluster import KMeans
 
 df = pd.read_csv("airports.csv")
 
@@ -21,7 +20,6 @@ fig = px.scatter_geo(df,
 
 fig.show()
 
-
 df_clean = df.dropna(subset=['tzone'])
 us_airports = df_clean[df_clean['tzone'].str.startswith('America/')]
 
@@ -33,7 +31,6 @@ fig_us = px.scatter_geo(us_airports,
                         title="Airports in the United States",
                         projection='albers usa')
 fig_us.show()
-
 
 nyc_lat = 40.7128
 nyc_lon = -74.0060
@@ -91,7 +88,6 @@ def user_input():
 
 user_input()
 
-
 JFK_lat = 40.641766
 JFK_lon = -73.780968
 
@@ -107,7 +103,6 @@ plt.xlabel('Distance (degrees)')
 plt.ylabel('Frequency')
 plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.show()
-
 
 # Earth's radius in kilometers
 R = 6.378
@@ -140,8 +135,6 @@ plt.ylabel('Frequency')
 plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.show()
 
-
-
 tz_counts = df["tz"].value_counts().sort_index()
 
 plt.figure(figsize=(10, 5))
@@ -153,11 +146,7 @@ plt.xticks(rotation=45)
 plt.grid(axis="y", linestyle="--", alpha=0.7)
 plt.show()
 
-
-
-# Extra analysis voor creative points
-
-from sklearn.cluster import KMeans
+# Extra analysis 
 
 num_clusters = 5
 coordinates = df[['lat', 'lon']]
@@ -167,3 +156,4 @@ df['cluster'] = kmeans.fit_predict(coordinates)
 fig = px.scatter_geo(df, lat='lat', lon='lon', hover_name='name', color=df['cluster'].astype(str),
                      title="Airport Clusters", projection='natural earth')
 fig.show()
+

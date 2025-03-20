@@ -14,7 +14,6 @@ db_path = "flights_database.db"  # Relative path since it's in the same folder
 conn = sqlite3.connect(db_path)
 cur = conn.cursor()
 
-
 query = """
     SELECT f.distance, a1.lat, a1.lon, a2.lat, a2.lon 
     FROM flights f
@@ -24,8 +23,6 @@ query = """
 """
 cur.execute(query)
 data = cur.fetchall()
-
-
 
 # Earth's radius in kilometers
 R = 6378
@@ -62,7 +59,6 @@ print(f"Average error: {avg_error:.2f} km")
 print(f"Max error: {max_error:.2f} km")
 print(f"Min error: {min_error:.2f} km")
 
-
 plt.figure(figsize=(8, 5))
 plt.hist(errors, bins=30, edgecolor='black')
 plt.title('Distribution of Errors Between Computed and Database Distances')
@@ -72,7 +68,6 @@ plt.grid(axis="y", linestyle="--", alpha=0.7)
 plt.show()
 
 # The small and consistent errors, indicated by the single bar in the histogram, suggest that the computed distances closely match the database values, demonstrating the accuracy and consistency of the distance calculations.
-
 
 query = """
     SELECT DISTINCT origin 
@@ -94,9 +89,7 @@ airport_data = cur.fetchall()
 columns = [description[0] for description in cur.description]  # Get column names
 airports_df = pd.DataFrame(airport_data, columns=columns)
 
-
 print(airports_df)
-
 
 for column in columns:
     print(column)
@@ -153,7 +146,6 @@ def get_flight_statistics(flights_df):
 get_input_date()
 
 
-
 def get_plane_types_for_trajectory(departure_airport_faa, arrival_airport_faa):
 
     query = """
@@ -187,7 +179,6 @@ def get_input_airports():
 
 get_input_airports()
 
-
 query = """
     SELECT a.name, AVG(f.dep_delay) AS avg_dep_delay
     FROM flights f
@@ -210,8 +201,6 @@ plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.tight_layout()
 
 plt.show()
-
-
 
 def get_delayed_flights(destination, start_month, end_month):
 
@@ -242,7 +231,6 @@ def get_input_delay():
 
 get_input_delay()
 
-
 def get_top_airplane_manufacturers(destination):
 
     query = """
@@ -257,7 +245,6 @@ def get_top_airplane_manufacturers(destination):
 
     cur.execute(query, (destination,))
     data = cur.fetchall()
-
 
     if not data:
         return f"No flights found to destination {destination}"
@@ -311,8 +298,8 @@ def analyze_relationship():
 
 analyze_relationship()
 
-# A Pearson Correlation Coefficient of 0.01 indicates that there is virtually no linear relationship between flight distance and arrival delay. This suggests that the distance of a flight does not significantly impact its arrival delay time.
-
+# A Pearson Correlation Coefficient of 0.01 indicates that there is virtually no linear relationship between flight distance and arrival delay. 
+# This suggests that the distance of a flight does not significantly impact its arrival delay time.
 
 
 def update_planes_with_speed():
@@ -340,9 +327,7 @@ def update_planes_with_speed():
 
     conn.commit()
 
-
 update_planes_with_speed()
-
 
 def calculate_bearing(lat1, lon1, lat2, lon2):
     """
@@ -371,7 +356,6 @@ def get_flight_directions():
         "EWR": (40.6895, -74.1745)
     }
 
-
     query = "SELECT faa, lat, lon FROM airports WHERE faa NOT IN ('JFK', 'LGA', 'EWR');"
     cur.execute(query)
     airports = cur.fetchall()
@@ -396,7 +380,6 @@ flight_directions = get_flight_directions()
 
 for airport, direction in flight_directions.items():
     print(f"Flight direction to {airport}: {direction:.2f}°")
-
 
 
 def compute_inner_product(flight_direction, wind_direction, wind_speed):
@@ -483,14 +466,10 @@ if result is not None:
         interpretation = "crosswind"
         expected_airtime = "minimal impact on airtime"
 
-
     print(f"Inner product between flight direction and wind speed: {result:.2f}")
     print(f"This correlates to a {interpretation}")
     print(f"Therefore, we expect a {expected_airtime}")
 
-
-
-# Close the database connection
 conn.close()
 
 

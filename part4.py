@@ -1,114 +1,144 @@
 import sqlite3
 import pandas as pd
-from datetime import datetime, timedelta
 import numpy as np
+from timezonefinder import TimezoneFinder
+from datetime import datetime, timedelta
+import pytz
 
 db_path = "flights_database.db"
 conn = sqlite3.connect(db_path)
 
-# Load the flights data
 query = "SELECT * FROM flights"
 flights_df = pd.read_sql(query, conn)
 
-# Drop rows where crucial columns have missing values (e.g., dep_time, arr_time, sched_dep_time)
-flights_df.dropna(subset=['dep_time', 'arr_time', 'sched_dep_time'], inplace=True)
-
-
-# After dropping rows with missing values, check if there are still any discrepancies
+# Missing values
 missing_values = flights_df.isnull().sum()
-print("Missing values in each column after dropping rows:")
-print(missing_values)
+print("Missing values in each column before handling:", missing_values)
 
-# Save the cleaned table (replace old one)
+numerical_cols = flights_df.select_dtypes(include=['float64', 'int64']).columns
+flights_df[numerical_cols] = flights_df[numerical_cols].fillna(0)
+
+categorical_cols = flights_df.select_dtypes(include=['object']).columns
+flights_df[categorical_cols] = flights_df[categorical_cols].fillna('UNKNOWN')
+
+flights_df['dep_time'].fillna(flights_df['sched_dep_time'], inplace=True)
+flights_df['arr_time'].fillna(flights_df['sched_arr_time'], inplace=True)
+
+
+# Handle duplicates
+duplicates_df = flights_df[flights_df.duplicated(subset=['year', 'month', 'day', 'sched_dep_time', 'carrier', 'flight', 'origin', 'dest'], keep=False)]
+print(f"\nTotal duplicate flights found: {duplicates_df.shape[0]}")
+flights_df = flights_df.drop_duplicates(subset=['year', 'month', 'day', 'sched_dep_time', 'carrier', 'flight', 'origin', 'dest'])
+
 flights_df.to_sql("flights_cleaned", conn, if_exists="replace", index=False)
 
-# Identify and remove duplicates based on key columns
-duplicate_flights = flights_df.duplicated(subset=['year', 'month', 'day', 'sched_dep_time', 'carrier', 'flight', 'origin', 'dest'], keep=False)
-flights_df = flights_df[~duplicate_flights]  # Remove duplicate rows
+# Datetime
+flights_df['sched_dep_time'] = pd.to_datetime(flights_df['sched_dep_time'], format='%H%M', errors='coerce')
+flights_df['dep_time'] = pd.to_datetime(flights_df['dep_time'], format='%H%M', errors='coerce')
+flights_df['sched_arr_time'] = pd.to_datetime(flights_df['sched_arr_time'], format='%H%M', errors='coerce')
+flights_df['arr_time'] = pd.to_datetime(flights_df['arr_time'], format='%H%M', errors='coerce')
 
-# Vectorized function to convert time to datetime
-def convert_to_datetime(time_value, year, month, day):
-    if pd.isna(time_value) or time_value == 0:
-        return None
-    
-    time_value = int(time_value)
-    if time_value == 2400:
-        time_value = 0
-    
-    hours = time_value // 100
-    minutes = time_value % 100
-    hours = min(hours, 23)  # Ensure hours don't exceed 23
-    return datetime(year, month, day, hours, minutes)
+flights_df['arr_time'].fillna(flights_df['sched_arr_time'], inplace=True)
+flights_df['sched_arr_time'].fillna(flights_df['sched_dep_time'] + pd.to_timedelta(flights_df['air_time'], unit='m'), inplace=True)
 
-# Apply conversion for all date/time columns
-flights_df['sched_dep_datetime'] = flights_df.apply(
-    lambda row: convert_to_datetime(row['sched_dep_time'], row['year'], row['month'], row['day']), axis=1)
-flights_df['dep_datetime'] = flights_df.apply(
-    lambda row: convert_to_datetime(row['dep_time'], row['year'], row['month'], row['day']), axis=1)
-flights_df['sched_arr_datetime'] = flights_df.apply(
-    lambda row: convert_to_datetime(row['sched_arr_time'], row['year'], row['month'], row['day']), axis=1)
-flights_df['arr_datetime'] = flights_df.apply(
-    lambda row: convert_to_datetime(row['arr_time'], row['year'], row['month'], row['day']), axis=1)
+print(f"Missing air_time before imputation: {flights_df['air_time'].isnull().sum()}")
 
-# Efficiently check for discrepancies
-def check_flight_data_order(flights_df):
-    discrepancies = []
+# air_time using actual departure and arrival times
+flights_df.loc[flights_df['air_time'].isnull(), 'air_time'] = (
+    (flights_df['arr_time'] - flights_df['dep_time']).dt.total_seconds() / 60
+)
 
-    # Check if dep_time is earlier than sched_dep_time
-    mask_dep_time = flights_df['dep_time'] < flights_df['sched_dep_time']
-    discrepancies += [f"Flight {row['flight']} (ID: {row['flight']}) has dep_time earlier than sched_dep_time."
-                      for idx, row in flights_df[mask_dep_time].iterrows()]
+# If air_time is still missing, use scheduled times
+flights_df.loc[flights_df['air_time'].isnull(), 'air_time'] = (
+    (flights_df['sched_arr_time'] - flights_df['sched_dep_time']).dt.total_seconds() / 60
+)
 
-    # Check if arr_time is earlier than dep_time
-    mask_arr_time = flights_df['arr_time'] < flights_df['dep_time']
-    discrepancies += [f"Flight {row['flight']} (ID: {row['flight']}) has arr_time earlier than dep_time."
-                      for idx, row in flights_df[mask_arr_time].iterrows()]
+# Unrealistic air_time values
+flights_df = flights_df[(flights_df['air_time'] >= 1) & (flights_df['air_time'] <= 1440)]
 
-    # Check if air_time matches the difference between arr_time and dep_time
-    mask_air_time = abs(flights_df['air_time'] - (flights_df['arr_time'] - flights_df['dep_time'])) > 5  # Allowing a margin of 5 minutes
-    discrepancies += [f"Flight {row['flight']} (ID: {row['flight']}) has inconsistent air_time. Expected: {row['arr_time'] - row['dep_time']}, Found: {row['air_time']}."
-                      for idx, row in flights_df[mask_air_time].iterrows()]
+print(f"Missing air_time after imputation: {flights_df['air_time'].isnull().sum()}")
 
-    return discrepancies
-
-# Fix arrival time discrepancies by setting to scheduled arrival time
-def fix_arrival_times(flights_df):
-    # Replace arr_time with sched_arr_time where arr_time is earlier than dep_time or missing
-    mask_arr_time = (flights_df['arr_time'] < flights_df['dep_time']) | flights_df['arr_time'].isna()
-    flights_df.loc[mask_arr_time, 'arr_time'] = flights_df.loc[mask_arr_time, 'sched_arr_time']
-    return flights_df
-
-# Ensure correct ordering of data (time and air_time consistency)
 def order_flight_data(flights_df):
-    # Ensure dep_time is not earlier than sched_dep_time
     flights_df.loc[flights_df['dep_time'] < flights_df['sched_dep_time'], 'dep_time'] = flights_df['sched_dep_time']
-    
-    # Ensure arr_time is not earlier than dep_time
     flights_df.loc[flights_df['arr_time'] < flights_df['dep_time'], 'arr_time'] = flights_df['dep_time']
-    
-    # Recalculate air_time based on the difference between arr_time and dep_time
     flights_df['air_time'] = (flights_df['arr_time'] - flights_df['dep_time']).dt.total_seconds() / 60
-    
-    # Remove unreasonable air_time values (less than 1 minute or more than 24 hours)
     flights_df = flights_df[(flights_df['air_time'] >= 1) & (flights_df['air_time'] <= 1440)]
-    
     return flights_df
 
-# Main function to clean and process the flights dataset
-def clean_flight_data(flights_df):
-    # Step 1: Handle missing values
-    flights_df = handle_missing_values(flights_df)
-    
-    # Step 2: Adjust time zones and create local arrival time
-    flights_df = adjust_timezone(flights_df)
-    
-    # Step 3: Ensure data is in order (dep_time, arr_time, air_time)
-    flights_df = order_flight_data(flights_df)
-    
-    return flights_df
+flights_df = order_flight_data(flights_df)
 
-# Example usage:
-# flights_df = pd.read_csv('flights_data.csv')  # Load your data here
-# cleaned_flights_df = clean_flight_data(flights_df)
+# Local time
+airport_coordinates = {
+    'EWR': (40.6895, -74.1745),
+    'SMF': (38.6954, -121.5914),
+    'JFK': (40.6413, -73.7781),
+    'ATL': (33.6407, -84.4279),
+}
+
+timezone_cache = {}
+tf = TimezoneFinder()
+
+def get_airport_timezone(airport_code):
+    if airport_code in timezone_cache:
+        return timezone_cache[airport_code]
+    coords = airport_coordinates.get(airport_code)
+    if coords:
+        timezone_str = tf.timezone_at(lng=coords[1], lat=coords[0])
+        if timezone_str:
+            timezone_cache[airport_code] = pytz.timezone(timezone_str)
+            return timezone_cache[airport_code]
+    timezone_cache[airport_code] = pytz.UTC
+    return pytz.UTC
+
+def convert_to_local_arrival(row):
+    if pd.isna(row['arr_time']):
+        return None
+    dest_tz = get_airport_timezone(row['dest'])
+    return row['arr_time'].tz_localize('UTC').astimezone(dest_tz)
+
+flights_df['local_arrival_time'] = flights_df.apply(convert_to_local_arrival, axis=1)
+
+print("\nFirst few rows of cleaned data:")
+print(flights_df.head())
 
 
+
+
+
+cursor = conn.cursor()
+query = """
+SELECT p.type, 
+       AVG(w.wind_speed) AS avg_wind_speed, 
+       AVG(w.precip) AS avg_precipitation, 
+       COUNT(f.flight) AS num_flights
+FROM flights_cleaned f
+JOIN weather w ON f.origin = w.origin AND f.time_hour = w.time_hour
+JOIN planes p ON f.tailnum = p.tailnum
+GROUP BY p.type
+ORDER BY num_flights DESC;
+"""
+
+# Execute query and load results into a DataFrame
+df = pd.read_sql_query(query, conn)
+print(df)
+df.fillna(0, inplace=True)
+import matplotlib.pyplot as plt
+
+fig, ax1 = plt.subplots(figsize=(10, 5))
+
+ax1.set_xlabel("Plane Type")
+ax1.set_ylabel("Avg Wind Speed (mph)", color='tab:blue')
+ax1.bar(df["type"], df["avg_wind_speed"], color='tab:blue', alpha=0.7, label="Avg Wind Speed")
+ax1.tick_params(axis='y', labelcolor='tab:blue')
+
+ax2 = ax1.twinx()
+ax2.set_ylabel("Avg Precipitation (inches)", color='tab:orange')
+ax2.plot(df["type"], df["avg_precipitation"], color='tab:orange', marker='o', label="Avg Precipitation")
+ax2.tick_params(axis='y', labelcolor='tab:orange')
+
+fig.suptitle("Effect of Wind & Precipitation on Different Plane Types")
+plt.show()
+
+
+
+conn.close()
