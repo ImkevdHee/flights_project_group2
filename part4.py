@@ -78,35 +78,37 @@ def fix_arrival_times(flights_df):
     flights_df.loc[mask_arr_time, 'arr_time'] = flights_df.loc[mask_arr_time, 'sched_arr_time']
     return flights_df
 
-# Fix departure time discrepancies by setting to scheduled departure time
-def fix_departure_times(flights_df):
-    mask_missing_dep_time = flights_df['dep_time'].isna()
-    flights_df.loc[mask_missing_dep_time, 'dep_time'] = flights_df.loc[mask_missing_dep_time, 'sched_dep_time']
+# Ensure correct ordering of data (time and air_time consistency)
+def order_flight_data(flights_df):
+    # Ensure dep_time is not earlier than sched_dep_time
+    flights_df.loc[flights_df['dep_time'] < flights_df['sched_dep_time'], 'dep_time'] = flights_df['sched_dep_time']
+    
+    # Ensure arr_time is not earlier than dep_time
+    flights_df.loc[flights_df['arr_time'] < flights_df['dep_time'], 'arr_time'] = flights_df['dep_time']
+    
+    # Recalculate air_time based on the difference between arr_time and dep_time
+    flights_df['air_time'] = (flights_df['arr_time'] - flights_df['dep_time']).dt.total_seconds() / 60
+    
+    # Remove unreasonable air_time values (less than 1 minute or more than 24 hours)
+    flights_df = flights_df[(flights_df['air_time'] >= 1) & (flights_df['air_time'] <= 1440)]
+    
     return flights_df
 
-# Recalculate air_time based on arr_time and dep_time
-def recalculate_air_time(flights_df):
-    mask_valid_times = pd.notna(flights_df['arr_time']) & pd.notna(flights_df['dep_time'])
-    flights_df.loc[mask_valid_times, 'air_time'] = flights_df.loc[mask_valid_times, 'arr_time'] - flights_df.loc[mask_valid_times, 'dep_time']
+# Main function to clean and process the flights dataset
+def clean_flight_data(flights_df):
+    # Step 1: Handle missing values
+    flights_df = handle_missing_values(flights_df)
+    
+    # Step 2: Adjust time zones and create local arrival time
+    flights_df = adjust_timezone(flights_df)
+    
+    # Step 3: Ensure data is in order (dep_time, arr_time, air_time)
+    flights_df = order_flight_data(flights_df)
+    
     return flights_df
 
-# Apply all fixes
-flights_df = fix_arrival_times(flights_df)
-flights_df = fix_departure_times(flights_df)
-flights_df = recalculate_air_time(flights_df)
+# Example usage:
+# flights_df = pd.read_csv('flights_data.csv')  # Load your data here
+# cleaned_flights_df = clean_flight_data(flights_df)
 
-# Check for discrepancies again after fixes
-discrepancies_after_fix = check_flight_data_order(flights_df)
 
-# Output the results
-if discrepancies_after_fix:
-    print(f"Total discrepancies found: {len(discrepancies_after_fix)}")
-    for discrepancy in discrepancies_after_fix:
-        print(discrepancy)
-else:
-    print("All flights data are now in order!")
-
-# Save the cleaned data after processing
-flights_df.to_sql("flights_cleaned", conn, if_exists="replace", index=False)
-
-conn.close()
