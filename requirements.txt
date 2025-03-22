@@ -30,8 +30,5 @@ cython
 cmake  
 pyarrow  
 
-## Team confirmation needed
-# Please verify if additional libraries like folium, geopandas, or pydeck were used.
-# If so, they should be added here for completeness.
 
 Add complete requirements.txt for project
