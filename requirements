@@ -1,0 +1,36 @@
+# requirements.txt for flights_project_group2
+
+## Core libraries
+streamlit >=1.0.0  
+pandas >=1.3.0  
+numpy >=1.21.0  
+plotly >=5.0.0  
+matplotlib >=3.4.0  
+seaborn >=0.11.0  
+
+## Data science and machine learning
+scikit-learn >=0.24.0  
+scipy >=1.7.0  
+statsmodels >=0.13.0  
+networkx >=2.6.0  
+
+## Geospatial and mapping
+geopy >=2.0.0  
+
+## Development and testing
+pytest >=6.0.0  
+jupyterlab >=3.0.0  
+ipython >=7.0.0  
+
+## Standard library note
+sqlite3  # Part of the Python standard library; listed for reference only
+
+## Optional dependencies (Apple Silicon / M1/M2 specific)
+cython  
+cmake  
+pyarrow  
+
+## Team confirmation needed
+# Please verify if additional libraries like folium, geopandas, or pydeck were used.
+# If so, they should be added here for completeness.
+
