@@ -5,7 +5,7 @@ cachetools==5.5.2
 certifi==2025.1.31
 charset-normalizer==3.4.1
 click==8.1.8
-debugpy==1.6.0
+debugpy==1.6.5
 decorator==5.1.1
 executing==1.2.0
 gitdb==4.0.12
@@ -31,7 +31,7 @@ parso==0.8.3
 pexpect==4.8.0
 pickleshare==0.7.5
 pillow==11.1.0
-platformdirs==2.7.0
+platformdirs>=3.0.0
 plotly==6.0.1
 prompt_toolkit==3.0.38
 protobuf==5.29.4
