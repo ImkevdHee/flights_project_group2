@@ -101,10 +101,6 @@ flights_df['local_arrival_time'] = flights_df.apply(convert_to_local_arrival, ax
 print("\nFirst few rows of cleaned data:")
 print(flights_df.head())
 
-
-
-
-
 cursor = conn.cursor()
 query = """
 SELECT p.type, 

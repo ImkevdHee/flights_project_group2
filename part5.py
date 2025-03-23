@@ -4,10 +4,8 @@ import sqlite3
 import plotly.express as px
 from datetime import datetime
 
-# Connect to database
 conn = sqlite3.connect("flights_database.db")
 
-# Load data for demonstration (adjust queries as needed)
 flights = pd.read_sql_query("SELECT * FROM flights", conn)
 weather = pd.read_sql_query("SELECT * FROM weather", conn)
 planes = pd.read_sql_query("SELECT * FROM planes", conn)
@@ -25,7 +23,6 @@ end_date = st.sidebar.date_input("Select End Date", datetime(2023, 12, 31))
 
 part_of_day = st.sidebar.selectbox("Select Part of Day", ["Anytime", "Morning", "Afternoon", "Evening", "Night"])
 
-# Adding the Flight Date column
 flights['fl_date'] = pd.to_datetime(flights[['year', 'month', 'day']])
 
 # Data filtering
@@ -89,5 +86,4 @@ if destinations:
     manufacturer_counts.columns = ["Manufacturer", "Number of Flights"]
     st.dataframe(manufacturer_counts)
 
-# Close connection
 conn.close()

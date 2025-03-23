@@ -1,4 +1,3 @@
-# Part 3
 import sqlite3
 import math
 import os
@@ -10,7 +9,7 @@ from collections import defaultdict
 import seaborn as sns
 from scipy.stats import pearsonr
 
-db_path = "flights_database.db"  # Relative path since it's in the same folder
+db_path = "flights_database.db"
 conn = sqlite3.connect(db_path)
 cur = conn.cursor()
 
