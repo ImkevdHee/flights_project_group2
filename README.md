@@ -29,8 +29,8 @@ flights_project_group2/
 ## Installation Instructions
 1. Clone this repository:
 ```
-git clone https://github.com/[your-github-username]/[repository-name].git
-cd [repository-name]
+git clone https://github.com/[ImkevdHee]/[flights_project_group2].git
+cd [flights_project_group2]
 ```
 2. (Optional) Create and activate a virtual environment:
 ```
