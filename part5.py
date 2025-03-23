@@ -25,6 +25,9 @@ end_date = st.sidebar.date_input("Select End Date", datetime(2023, 12, 31))
 
 part_of_day = st.sidebar.selectbox("Select Part of Day", ["Anytime", "Morning", "Afternoon", "Evening", "Night"])
 
+# Adding the Flight Date column
+flights['fl_date'] = pd.to_datetime(flights[['year', 'month', 'day']])
+
 # Data filtering
 filtered_flights = flights[
     (flights["origin"].isin(departure_airports)) &
@@ -41,7 +44,7 @@ if part_of_day != "Anytime":
 
 # Metrics
 total_flights = filtered_flights.shape[0]
-avg_dep_delay = filtered_flights["dep_delay"].mean().round(2)
+avg_dep_delay = round(filtered_flights["dep_delay"].mean(), 2)
 most_freq_dest = filtered_flights["dest"].mode()[0] if not filtered_flights.empty else "-"
 
 st.metric("Total number of flights", total_flights)
